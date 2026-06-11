@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>세이프크로싱 — 횡단보도 미스매치 위험구간 진단 콘솔</title>
+<meta name="description" content="TAAS 보행사고 데이터와 노인 통행 발생원 위치를 결합해 '횡단보도가 없어 무단횡단이 유발되는 빈 구간'을 자동 순위화하는 보행안전 진단 프로토타입">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="head-inner">
+    <div class="brand-row">
+      <span class="logo">세이프크로싱</span>
+      <h1>횡단보도 미스매치 위험구간 진단 콘솔</h1>
+    </div>
+    <div class="badges">
+      <span class="badge">국민생각함 정책 아이디어 공모전 실증 프로토타입</span>
+      <span class="badge">공공데이터 구조 기반 · TAAS × 노인 통행 발생원</span>
+      <span class="badge warn">⚠ 시연용 표본 데이터 (평택시 지명 참조, 수치는 데모값)</span>
+    </div>
+    <p class="tagline">
+      '횡단보도가 없어 무단횡단이 유발되는 빈 구간'을 데이터로 발굴합니다.
+      미스매치 점수 = 고령자 통행 발생원 밀집도 × f(횡단보도 도보거리) — 상위 구간을
+      교통안전시설 심의의 우선설치 리스트로 제공하고, 신설이 어려운 곳엔 단계별 능동경보를 권고합니다.
+    </p>
+  </div>
+</header>
+
+<div class="kpis">
+  <div class="kpi-card"><b id="kpi-total">-</b><span>진단 구간 수</span></div>
+  <div class="kpi-card"><b id="kpi-a">-</b><span>A등급 (최우선 설치검토)</span></div>
+  <div class="kpi-card"><b id="kpi-b">-</b><span>B등급 (우선 보강)</span></div>
+  <div class="kpi-card"><b id="kpi-dist">-</b><span>평균 횡단보도 접근거리</span></div>
+  <div class="kpi-card"><b id="kpi-precision">-</b><span>TAAS 교차검증 적중률 (B등급 이상)</span></div>
+</div>
+
+<main>
+  <div class="workspace">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>위험구간 우선순위</h2>
+        <div class="filters">
+          <button class="filter-btn on" data-grade="ALL">전체</button>
+          <button class="filter-btn" data-grade="A">A</button>
+          <button class="filter-btn" data-grade="B">B</button>
+          <button class="filter-btn" data-grade="C">C</button>
+        </div>
+      </div>
+      <div id="rank-list"></div>
+    </div>
+    <div class="panel">
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <div id="detail"></div>
+
+  <section class="method">
+    <h2>산출 방법론 — 제안서 정의 그대로 구현</h2>
+    <div class="method-grid">
+      <div class="method-card">
+        <h3>① 미스매치 점수식</h3>
+        <p><b>점수 = Σ(발생원 유형가중치) × f(도보거리)</b></p>
+        <ul>
+          <li>발생원 = 노인복지관·경로당·전통시장·병원·약국 (횡단수요 대리지표)</li>
+          <li>거리 하한 10m (분모 발산 방지)</li>
+          <li>고령자 통행 피크 시간대로 구간×시간대 2차원화</li>
+          <li>표본 최대 밀집도 3.0 기준 0~100 정규화</li>
+        </ul>
+      </div>
+      <div class="method-card">
+        <h3>② 거리구간별 가중치 f(d)</h3>
+        <table>
+          <thead><tr><th>도보거리 구간</th><th class="num">가중치</th></tr></thead>
+          <tbody>
+            <tr><td>100m 이하 (권장 이격 내)</td><td class="num">0.0</td></tr>
+            <tr><td>100~200m</td><td class="num">0.4</td></tr>
+            <tr><td>200~300m</td><td class="num">0.7</td></tr>
+            <tr><td>300~500m</td><td class="num">0.9</td></tr>
+            <tr><td>500m 초과</td><td class="num">1.0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="method-card">
+        <h3>③ 사후검증 루프</h3>
+        <p>횡단수요는 시설밀집 기반 <b>대리추정치</b>이므로, 산출 상위 구간을
+        TAAS 실제 보행사고 다발지점과 교차검증해 적중률(precision)을 상시 보고합니다.
+        미일치 구간은 대리지표 한계 구간으로 분류해 점수식 개선에 환류합니다.</p>
+        <ul>
+          <li>1단계 진단 → 2단계 심의 리스트 제공 → 3단계 능동경보</li>
+          <li>도로교통법 §10①·시행규칙 §11 내 행정보조 (입법 불요)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="foot-inner">
+    <p><b>세이프크로싱 프로토타입</b> — 2026 국민생각함 정책 아이디어 공모전 (성인일반부) 제안 「세이프크로싱」의 실증 가능성 시연용.</p>
+    <p>데이터 출처(실서비스 기준): 도로교통공단 TAAS 교통사고분석시스템 · 공공데이터포털(data.go.kr) 노인복지시설/전통시장/병의원 위치 · OpenStreetMap 보행 네트워크.</p>
+    <p>본 화면의 구간·사고건수·거리 수치는 <b>실데이터 구조를 따른 시연용 표본</b>이며 실제 통계가 아닙니다. 실서비스 전환 시 TAAS·공공데이터포털 API 연동으로 동일 파이프라인이 작동합니다.</p>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
